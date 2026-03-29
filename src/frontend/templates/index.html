@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tech Pulse — AI-Curated News</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/app.css">
+    <script>(function(){var t=localStorage.getItem('theme');if(!t&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t==='dark')document.documentElement.setAttribute('data-theme','dark');})();</script>
+</head>
+<body>
+    <header>
+        <div class="header-top">
+            <h1><a href="/">Tech Pulse</a></h1>
+            <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+                <span class="theme-icon"></span>
+            </button>
+        </div>
+        <p class="tagline">AI-curated tech news, updated hourly</p>
+    </header>
+    <main>
+        <div id="news-list">
+            <!-- NEWS_ITEMS_PLACEHOLDER -->
+        </div>
+        <div id="pagination"></div>
+        <div id="empty-state" style="display:none;">
+            <p>No news yet. The AI curator is gathering stories — check back soon.</p>
+        </div>
+    </main>
+    <footer>
+        <p>Powered by Docker Agent &amp; Azure OpenAI</p>
+    </footer>
+    <script src="/static/app.js"></script>
+</body>
+</html>

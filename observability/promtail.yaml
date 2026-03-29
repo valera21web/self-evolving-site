@@ -1,0 +1,33 @@
+server:
+  http_listen_port: 9080
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: cagent-dev-agent
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: dev-agent
+          agent: dev-agent
+          __path__: /logs/dev-agent-debug.log
+
+  - job_name: cagent-news-agent
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: news-agent
+          agent: news-agent
+          __path__: /logs/news-agent.log
+
+  - job_name: cagent-news-agent-cron
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: news-agent-cron
+          agent: news-agent
+          __path__: /logs/news-agent-cron.log

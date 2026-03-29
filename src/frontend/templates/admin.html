@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin — Tech Pulse</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body class="admin-body">
+    <div class="admin-app">
+        <!-- Sidebar: Sessions -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Sessions</h2>
+                <button id="new-session-btn" title="New session">+</button>
+            </div>
+            <div id="session-list" class="session-list"></div>
+        </aside>
+
+        <!-- Main: Chat -->
+        <section class="chat-panel" id="chat-panel">
+            <div class="chat-header" id="chat-header">
+                <span class="session-title" id="session-title-display">Select or create a session</span>
+                <div class="chat-header-actions">
+                    <button id="rename-btn" class="icon-btn" title="Rename session" disabled>Rename</button>
+                    <button id="delete-btn" class="icon-btn danger" title="Delete session" disabled>Delete</button>
+                </div>
+            </div>
+            <div id="chat-messages" class="chat-messages">
+                <div class="empty-chat">
+                    <p>Create or select a session to start chatting with the Dev Agent.</p>
+                </div>
+            </div>
+            <form id="chat-form" class="chat-form">
+                <input type="text" id="chat-input" placeholder="Type your instruction..." autocomplete="off" disabled>
+                <button type="submit" id="send-btn" disabled>Send</button>
+            </form>
+        </section>
+
+        <!-- Right panel: Progress -->
+        <aside class="progress-panel" id="progress-panel">
+            <div class="progress-header">
+                <h3>Agent Progress</h3>
+                <div class="agent-status" id="agent-status">
+                    <span class="status-dot idle"></span>
+                    <span class="status-text">Idle</span>
+                </div>
+            </div>
+            <div id="progress-content" class="progress-content">
+                <div class="progress-section">
+                    <h4>Plan</h4>
+                    <div id="plan-tracker" class="plan-tracker"></div>
+                </div>
+                <div class="progress-section">
+                    <h4>Files Changed</h4>
+                    <div id="files-changed" class="files-changed">
+                        <p class="muted">None</p>
+                    </div>
+                    <button id="review-btn" class="review-btn" style="display:none;">Review Changes</button>
+                    <button id="commit-btn" class="commit-btn" style="display:none;">Commit All Files</button>
+                    <button id="deploy-btn" class="deploy-btn" style="display:none;">Deploy Changes</button>
+                    <button id="discard-btn" class="discard-btn" style="display:none;">Discard</button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Side-by-side diff modal -->
+    <div id="diff-modal" class="diff-modal-overlay" style="display:none;">
+        <div class="diff-modal">
+            <div class="diff-modal-header">
+                <span class="diff-modal-title" id="diff-modal-title"></span>
+                <button class="diff-modal-close" id="diff-modal-close">&times;</button>
+            </div>
+            <div class="diff-modal-body" id="diff-modal-body"></div>
+        </div>
+    </div>
+
+    <script src="/static/admin.js"></script>
+</body>
+</html>

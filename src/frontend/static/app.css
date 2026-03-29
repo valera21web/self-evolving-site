@@ -1,0 +1,217 @@
+/* App styles — news site (index, article pages) */
+header {
+    background: var(--color-surface);
+    border-bottom: 2px solid var(--color-border);
+    padding: 1.5rem 2rem;
+}
+
+.header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+header h1 a {
+    color: var(--color-link);
+    text-decoration: none;
+}
+
+header .tagline {
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+    margin-top: 0.25rem;
+}
+
+header .badge {
+    background: #e53e3e;
+    color: #fff;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    vertical-align: middle;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Theme toggle */
+.theme-toggle {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 20px;
+    padding: 0.4rem 0.6rem;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    transition: background 0.2s;
+}
+
+.theme-toggle:hover {
+    background: var(--color-border);
+}
+
+main {
+    flex: 1;
+    max-width: 800px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* News list */
+.news-item {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+    transition: box-shadow 0.2s;
+}
+
+.news-item:hover {
+    box-shadow: 0 2px 8px var(--color-shadow);
+}
+
+.news-item h2 {
+    font-size: 1.15rem;
+    margin-bottom: 0.5rem;
+}
+
+.news-item h2 a {
+    color: var(--color-link);
+    text-decoration: none;
+}
+
+.news-item h2 a:hover {
+    color: var(--color-link-hover);
+}
+
+.news-item .summary {
+    color: var(--color-text-body);
+    font-size: 0.95rem;
+    margin-bottom: 0.75rem;
+}
+
+.news-item .meta {
+    font-size: 0.8rem;
+    color: var(--color-text-tertiary);
+}
+
+.meta .source {
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.meta .date {
+    margin-left: 1rem;
+}
+
+/* Tags */
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.tag {
+    display: inline-block;
+    background: var(--color-tag-bg);
+    color: var(--color-tag-text);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+}
+
+.news-item .short-description {
+    color: var(--color-text-body);
+    font-size: 0.95rem;
+    margin-bottom: 0.6rem;
+}
+
+/* Article page */
+article h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+article .meta {
+    font-size: 0.85rem;
+    color: var(--color-text-tertiary);
+    margin-bottom: 1.5rem;
+}
+
+article .full-description {
+    font-size: 1.05rem;
+    line-height: 1.7;
+    margin-bottom: 1.5rem;
+    white-space: pre-line;
+}
+
+article .tags {
+    margin-bottom: 1.25rem;
+}
+
+.read-original {
+    display: inline-block;
+    color: var(--color-link-hover);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.read-original:hover {
+    text-decoration: underline;
+}
+
+.back-link {
+    display: inline-block;
+    margin-top: 2rem;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+}
+
+.back-link:hover {
+    color: var(--color-text);
+}
+
+#empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--color-text-tertiary);
+}
+
+/* Pagination */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 1.5rem 0;
+    flex-wrap: wrap;
+}
+
+.page-btn {
+    background: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.page-btn:hover:not(:disabled):not(.active) {
+    background: var(--color-border);
+}
+
+.page-btn.active {
+    background: #2563eb;
+    color: #fff;
+    border-color: #2563eb;
+}
+
+.page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}

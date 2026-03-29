@@ -1,0 +1,12 @@
+.git
+.claude
+.playwright-mcp
+.env
+.gitignore
+Dockerfile
+docker-compose.yml
+CLAUDE.md
+README.md
+dist
+observability
+*.md

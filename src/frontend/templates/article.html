@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITLE}} — Tech Pulse</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/app.css">
+    <script>(function(){var t=localStorage.getItem('theme');if(!t&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)t='dark';if(t==='dark')document.documentElement.setAttribute('data-theme','dark');})();</script>
+</head>
+<body>
+    <header>
+        <div class="header-top">
+            <h1><a href="/">Tech Pulse</a></h1>
+            <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+                <span class="theme-icon"></span>
+            </button>
+        </div>
+    </header>
+    <main>
+        <article>
+            <h2>{{TITLE}}</h2>
+            <div class="meta">
+                <span class="source">{{SOURCE_NAME}}</span>
+                <span class="date">{{PUBLISHED_AT}}</span>
+            </div>
+            <div class="tags">{{TAGS_HTML}}</div>
+            <div class="full-description">{{FULL_DESCRIPTION}}</div>
+            <a href="{{SOURCE_URL}}" target="_blank" rel="noopener" class="read-original">Read original article →</a>
+        </article>
+        <a href="/" class="back-link">← Back to all news</a>
+    </main>
+    <footer>
+        <p>Powered by Docker Agent &amp; Azure OpenAI</p>
+    </footer>
+    <script src="/static/app.js"></script>
+</body>
+</html>

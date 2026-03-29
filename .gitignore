@@ -1,0 +1,11 @@
+dist/
+workdir/
+node_modules/
+.htpasswd
+*.log
+.env
+session.db*
+tui_state.db*
+.cagent/
+.playwright-mcp/
+.DS_Store

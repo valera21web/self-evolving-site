@@ -1,0 +1,538 @@
+{
+  "editable": true,
+  "id": null,
+  "panels": [
+    {
+      "title": "Traces & Performance",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "title": "Recent Traces",
+      "description": "Last 20 traces — click a Trace ID to drill into details",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 1 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceqlSearch",
+          "tableType": "traces",
+          "limit": 20,
+          "filters": [
+            {
+              "id": "service-name",
+              "scope": "resource",
+              "tag": "service.name",
+              "operator": "=",
+              "value": ["tech-pulse-agent"],
+              "valueType": "string"
+            }
+          ],
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Start time", "desc": true }]
+      },
+      "timeFrom": "30m"
+    },
+    {
+      "title": "Requests by Agent",
+      "description": "Total agent sessions in selected time range",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 9 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "expr": "sum by (job) (count_over_time({job=~\"dev-agent|news-agent\"} |= \"Running agent\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Total LLM Calls",
+      "description": "Number of LLM API calls across all agents",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 9 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "expr": "sum(count_over_time({job=~\"dev-agent|news-agent\"} |= \"Stream processed\" [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "purple", "value": null },
+              { "color": "orange", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Total Tokens Used",
+      "description": "Sum of input + output tokens across all LLM calls",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 9 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "expr": "sum(sum_over_time({job=~\"dev-agent|news-agent\"} |= \"Stream processed\" | logfmt | unwrap input_tokens [$__range])) + sum(sum_over_time({job=~\"dev-agent|news-agent\"} |= \"Stream processed\" | logfmt | unwrap output_tokens [$__range]))",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "semi-dark-yellow", "value": null },
+              { "color": "red", "value": 100000 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "title": "LLM Calls Over Time",
+      "description": "Rate of LLM API calls per agent",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "expr": "sum by (job) (count_over_time({job=~\"dev-agent|news-agent\"} |= \"Stream processed\" [5m]))",
+          "queryType": "range",
+          "legendFormat": "{{job}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 30,
+            "stacking": { "mode": "normal" },
+            "showPoints": "never"
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Session Duration",
+      "description": "Agent session durations from traces",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceqlSearch",
+          "tableType": "traces",
+          "limit": 20,
+          "filters": [
+            {
+              "id": "service-name",
+              "scope": "resource",
+              "tag": "service.name",
+              "operator": "=",
+              "value": ["tech-pulse-agent"],
+              "valueType": "string"
+            },
+            {
+              "id": "span-name",
+              "scope": "span",
+              "tag": "name",
+              "operator": "=~",
+              "value": ["session:.*"],
+              "valueType": "string"
+            }
+          ],
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Start time", "desc": true }]
+      }
+    },
+    {
+      "title": "LLM Response Time by Model",
+      "description": "Duration of LLM calls grouped by model",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceqlSearch",
+          "tableType": "spans",
+          "limit": 50,
+          "filters": [
+            {
+              "id": "service-name",
+              "scope": "resource",
+              "tag": "service.name",
+              "operator": "=",
+              "value": ["tech-pulse-agent"],
+              "valueType": "string"
+            },
+            {
+              "id": "span-name",
+              "scope": "span",
+              "tag": "name",
+              "operator": "=~",
+              "value": ["llm:.*"],
+              "valueType": "string"
+            }
+          ],
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Start time", "desc": true }]
+      }
+    },
+    {
+      "title": "Token Usage per Model",
+      "description": "Input/output tokens and call count by model — use for cost estimation",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 30 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "expr": "sum by (model) (sum_over_time({job=~\"dev-agent|news-agent\"} |= \"Stream processed\" | logfmt | unwrap input_tokens [$__range]))",
+          "queryType": "range",
+          "legendFormat": "{{model}} input",
+          "refId": "input"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "expr": "sum by (model) (sum_over_time({job=~\"dev-agent|news-agent\"} |= \"Stream processed\" | logfmt | unwrap output_tokens [$__range]))",
+          "queryType": "range",
+          "legendFormat": "{{model}} output",
+          "refId": "output"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "expr": "sum by (model) (count_over_time({job=~\"dev-agent|news-agent\"} |= \"Stream processed\" | logfmt [$__range]))",
+          "queryType": "range",
+          "legendFormat": "{{model}} calls",
+          "refId": "calls"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "input": "Input Tokens",
+              "output": "Output Tokens",
+              "calls": "Calls"
+            }
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Tokens by Sub-Agent",
+      "description": "Total token usage per sub-agent (orchestrator, analyzer, writer, etc.)",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 30 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "expr": "sum by (current_agent) (sum_over_time({job=~\"dev-agent|news-agent\"} |= \"Stream processed\" | logfmt | unwrap input_tokens [$__range]))",
+          "queryType": "range",
+          "legendFormat": "{{current_agent}} input",
+          "refId": "input"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "expr": "sum by (current_agent) (sum_over_time({job=~\"dev-agent|news-agent\"} |= \"Stream processed\" | logfmt | unwrap output_tokens [$__range]))",
+          "queryType": "range",
+          "legendFormat": "{{current_agent}} output",
+          "refId": "output"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "stacking": { "mode": "normal" },
+            "fillOpacity": 80
+          },
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "xField": "current_agent",
+        "orientation": "horizontal"
+      }
+    },
+    {
+      "title": "Token Trend by Model",
+      "description": "Token consumption rate over time per model",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 38 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "expr": "sum by (model) (sum_over_time({job=~\"dev-agent|news-agent\"} |= \"Stream processed\" | logfmt | unwrap input_tokens [5m]))",
+          "queryType": "range",
+          "legendFormat": "{{model}} input",
+          "refId": "input"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "editorMode": "code",
+          "expr": "sum by (model) (sum_over_time({job=~\"dev-agent|news-agent\"} |= \"Stream processed\" | logfmt | unwrap output_tokens [5m]))",
+          "queryType": "range",
+          "legendFormat": "{{model}} output",
+          "refId": "output"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "stacking": { "mode": "normal" },
+            "showPoints": "never"
+          },
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "title": "Logs",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 },
+      "collapsed": true,
+      "panels": [
+        {
+          "title": "Agent Sessions",
+          "description": "All agent invocations with session IDs",
+          "type": "logs",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 47 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "editorMode": "code",
+              "expr": "{job=\"dev-agent\"} |~ \"(Running agent|REQUEST|Conversation stopped)\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "options": { "showTime": true, "showLabels": false, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" }
+        },
+        {
+          "title": "Sub-Agent Delegations (transfer_task)",
+          "description": "Orchestrator → analyzer / implementer / verifier",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 55 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "editorMode": "code",
+              "expr": "{job=\"dev-agent\"} |~ \"Transferring task to agent\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "options": { "showTime": true, "showLabels": false, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" }
+        },
+        {
+          "title": "Tool Calls & Execution",
+          "description": "Shell commands, file reads/writes, tool approvals",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 65 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "editorMode": "code",
+              "expr": "{job=\"dev-agent\"} |~ \"(Tool call completed|Tool auto-approved|Processing tool call|Executing native shell)\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "options": { "showTime": true, "showLabels": false, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" }
+        },
+        {
+          "title": "LLM Requests (prompts & models)",
+          "description": "OpenAI API calls with model, message count, tool count",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 65 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "editorMode": "code",
+              "expr": "{job=\"dev-agent\"} |~ \"(OpenAI chat completion request|Creating OpenAI chat completion|Model selected)\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "options": { "showTime": true, "showLabels": false, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" }
+        },
+        {
+          "title": "Agent Conversation Flow",
+          "description": "Start → iterations → delegation → stop",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 75 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "editorMode": "code",
+              "expr": "{job=\"dev-agent\"} |~ \"(Running agent|Starting conversation loop|Conversation stopped|Using agent|Starting runtime)\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "options": { "showTime": true, "showLabels": false, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" }
+        },
+        {
+          "title": "Errors & Warnings",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 75 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "editorMode": "code",
+              "expr": "{job=~\"dev-agent|news-agent\"} |~ \"(?i)(error|fail|panic|WARN)\" != \"OpenTelemetry SDK\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" }
+        },
+        {
+          "title": "News Agent Activity",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 85 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "editorMode": "code",
+              "expr": "{job=~\"news-agent|news-agent-cron\"}",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending" }
+        },
+        {
+          "title": "Log Volume by Agent",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 24, "x": 0, "y": 95 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "editorMode": "code",
+              "expr": "sum by (job) (rate({job=~\"dev-agent|news-agent|news-agent-cron\"}[1m]))",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 30, "stacking": { "mode": "normal" } } },
+            "overrides": []
+          }
+        }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["agents", "observability"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "title": "Agent Activity",
+  "uid": "agent-activity",
+  "version": 3
+}
