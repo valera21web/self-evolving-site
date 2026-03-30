@@ -4,22 +4,13 @@ var fs = require('fs');
 var url = require('url');
 
 var SRC = '/app/src/frontend';
-var WORKDIR = '/app/workdir/frontend';
-var WORKDIR_ROOT = '/app/workdir';
+var SESSIONS_DIR = '/app/sessions';
+var WORKDIR_SYMLINK = '/app/workdir';
 var PORT = 8081;
 
 function json(res, data, status) {
     res.writeHead(status || 200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(data));
-}
-
-function workdirExists() {
-    try {
-        fs.accessSync(WORKDIR, fs.constants.F_OK);
-        return true;
-    } catch (e) {
-        return false;
-    }
 }
 
 function activeSession() {
@@ -30,9 +21,32 @@ function activeSession() {
     }
 }
 
-function getBaseCommit() {
-    var session = activeSession();
-    var basePath = session ? '/app/.branch-base-' + session : '/app/.branch-base';
+function sessionWorkdir(sessionId) {
+    var sid = sessionId || activeSession();
+    if (!sid) return '';
+    return SESSIONS_DIR + '/' + sid;
+}
+
+function sessionFrontend(sessionId) {
+    var root = sessionWorkdir(sessionId);
+    return root ? root + '/frontend' : '';
+}
+
+function workdirExists(sessionId) {
+    var dir = sessionFrontend(sessionId);
+    if (!dir) return false;
+    try {
+        fs.accessSync(dir, fs.constants.F_OK);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function getBaseCommit(sessionId) {
+    var root = sessionWorkdir(sessionId);
+    if (!root) return null;
+    var basePath = root + '/.branch-base';
     try {
         return fs.readFileSync(basePath, 'utf8').trim();
     } catch (e) {
@@ -40,14 +54,14 @@ function getBaseCommit() {
     }
 }
 
-function getChangedFiles() {
-    if (!workdirExists()) return [];
+function getChangedFiles(sessionId) {
+    if (!workdirExists(sessionId)) return [];
 
-    var base = getBaseCommit();
+    var root = sessionWorkdir(sessionId);
+    var base = getBaseCommit(sessionId);
     if (base) {
-        // Git diff against base commit — shows cumulative changes across all rounds
         var result = spawnSync('git', ['diff', '--name-status', base, '--', 'frontend/'], {
-            cwd: WORKDIR_ROOT, encoding: 'utf8'
+            cwd: root, encoding: 'utf8'
         });
         var out = result.stdout || '';
         var files = [];
@@ -64,7 +78,8 @@ function getChangedFiles() {
     }
 
     // Fallback: file-level diff
-    var result = spawnSync('diff', ['-rq', SRC, WORKDIR], { encoding: 'utf8' });
+    var frontend = sessionFrontend(sessionId);
+    var result = spawnSync('diff', ['-rq', SRC, frontend], { encoding: 'utf8' });
     var out = (result.stdout || '') + (result.stderr || '');
     var files = [];
     out.split('\n').forEach(function (line) {
@@ -75,7 +90,7 @@ function getChangedFiles() {
             files.push({ file: differMatch[1], status: 'modified' });
             return;
         }
-        var onlyWorkdir = line.match(/^Only in \/app\/workdir\/frontend\/?(.*):\s+(.+)$/);
+        var onlyWorkdir = line.match(/^Only in .*?\/sessions\/[^/]+\/frontend\/?(.*):\s+(.+)$/);
         if (onlyWorkdir) {
             var dir = onlyWorkdir[1] ? onlyWorkdir[1] + '/' : '';
             files.push({ file: dir + onlyWorkdir[2], status: 'added' });
@@ -90,62 +105,59 @@ function getChangedFiles() {
     return files;
 }
 
-function getDiff(file) {
-    if (!workdirExists()) return '';
+function getDiff(file, sessionId) {
+    if (!workdirExists(sessionId)) return '';
 
-    var base = getBaseCommit();
+    var root = sessionWorkdir(sessionId);
+    var base = getBaseCommit(sessionId);
     if (base) {
-        // Git diff against base — cumulative
         var result = spawnSync('git', ['diff', base, '--', 'frontend/' + file], {
-            cwd: WORKDIR_ROOT, encoding: 'utf8'
+            cwd: root, encoding: 'utf8'
         });
         return result.stdout || '';
     }
 
     // Fallback: file-level diff
     var srcFile = SRC + '/' + file;
-    var workFile = WORKDIR + '/' + file;
+    var workFile = sessionFrontend(sessionId) + '/' + file;
     var result = spawnSync('diff', ['-uN', srcFile, workFile], { encoding: 'utf8' });
     return result.stdout || '';
 }
 
-function getAllDiffs() {
-    var files = getChangedFiles();
+function getAllDiffs(sessionId) {
+    var files = getChangedFiles(sessionId);
     return files.map(function (f) {
-        return { file: f.file, status: f.status, diff: getDiff(f.file) };
+        return { file: f.file, status: f.status, diff: getDiff(f.file, sessionId) };
     });
 }
 
-function isCommitted() {
-    if (!workdirExists()) return false;
-    // Check if there are any commits on the feature branch beyond the branch point
+function isCommitted(sessionId) {
+    if (!workdirExists(sessionId)) return false;
+    var root = sessionWorkdir(sessionId);
     var result = spawnSync('git', ['log', '--oneline', '-1', '--format=%s'], {
-        cwd: WORKDIR_ROOT, encoding: 'utf8'
+        cwd: root, encoding: 'utf8'
     });
     var msg = (result.stdout || '').trim();
-    // If the last commit message contains our commit marker, it's committed
     return msg.indexOf('[reviewed]') !== -1;
 }
 
-function commitAll(message) {
-    if (!workdirExists()) return { ok: false, error: 'No worktree found' };
+function commitAll(message, sessionId) {
+    var root = sessionWorkdir(sessionId);
+    if (!root || !workdirExists(sessionId)) return { ok: false, error: 'No worktree found' };
 
-    // Stage all changes
-    var addResult = spawnSync('git', ['add', '-A'], { cwd: WORKDIR_ROOT, encoding: 'utf8' });
+    var addResult = spawnSync('git', ['add', '-A'], { cwd: root, encoding: 'utf8' });
     if (addResult.status !== 0) {
         return { ok: false, error: 'git add failed: ' + (addResult.stderr || '') };
     }
 
-    // Check if there's anything to commit
-    var statusResult = spawnSync('git', ['diff', '--cached', '--quiet'], { cwd: WORKDIR_ROOT });
+    var statusResult = spawnSync('git', ['diff', '--cached', '--quiet'], { cwd: root });
     if (statusResult.status === 0) {
         return { ok: false, error: 'No changes to commit' };
     }
 
-    // Commit with the message + marker
     var commitMsg = message + ' [reviewed]';
     var commitResult = spawnSync('git', ['commit', '-m', commitMsg], {
-        cwd: WORKDIR_ROOT, encoding: 'utf8'
+        cwd: root, encoding: 'utf8'
     });
     if (commitResult.status !== 0) {
         return { ok: false, error: 'git commit failed: ' + (commitResult.stderr || '') };
@@ -155,7 +167,6 @@ function commitAll(message) {
 }
 
 function runDeploy() {
-    // Merges feature branch to main, removes worktree, rebuilds site
     var result = spawnSync('bash', ['/app/scripts/git-worktree.sh', 'deploy'], {
         cwd: '/app', encoding: 'utf8', timeout: 60000
     });
@@ -171,7 +182,31 @@ function runDiscard() {
         cwd: '/app', encoding: 'utf8', timeout: 15000
     });
     var output = (result.stdout || '') + (result.stderr || '');
-    return { ok: true, output: output };
+    return { ok: result.status === 0, output: output };
+}
+
+function runCreate(sessionId) {
+    if (!sessionId) return { ok: false, error: 'session required' };
+    var result = spawnSync('bash', ['/app/scripts/git-worktree.sh', 'create', sessionId], {
+        cwd: '/app', encoding: 'utf8', timeout: 15000
+    });
+    var output = (result.stdout || '') + (result.stderr || '');
+    if (result.status !== 0) {
+        return { ok: false, error: 'create failed (exit ' + result.status + ')', output: output };
+    }
+    return { ok: true, session: sessionId, output: output };
+}
+
+function runDelete(sessionId) {
+    if (!sessionId) return { ok: false, error: 'session required' };
+    var result = spawnSync('bash', ['/app/scripts/git-worktree.sh', 'delete', sessionId], {
+        cwd: '/app', encoding: 'utf8', timeout: 15000
+    });
+    var output = (result.stdout || '') + (result.stderr || '');
+    if (result.status !== 0) {
+        return { ok: false, error: 'delete failed (exit ' + result.status + ')', session: sessionId, output: output };
+    }
+    return { ok: true, session: sessionId, output: output };
 }
 
 function readBody(req, callback) {
@@ -195,18 +230,50 @@ var server = http.createServer(function (req, res) {
         json(res, getAllDiffs());
     } else if (req.method === 'GET' && path === '/status') {
         json(res, { worktree: workdirExists(), committed: isCommitted() });
+    } else if (req.method === 'POST' && path === '/create') {
+        readBody(req, function (body) {
+            var data = {};
+            try { data = JSON.parse(body); } catch (e) {}
+            var session = data.session || '';
+            if (!session) return json(res, { error: 'session required' }, 400);
+            var result = runCreate(session);
+            json(res, result, result.ok ? 200 : 500);
+        });
     } else if (req.method === 'POST' && path === '/deploy') {
         var result = runDeploy();
         json(res, result, result.ok ? 200 : 500);
     } else if (req.method === 'POST' && path === '/discard') {
         var result = runDiscard();
         json(res, result);
+    } else if (req.method === 'POST' && path === '/delete') {
+        readBody(req, function (body) {
+            var data = {};
+            try { data = JSON.parse(body); } catch (e) {}
+            var session = data.session || '';
+            if (!session) return json(res, { error: 'session required' }, 400);
+            var result = runDelete(session);
+            json(res, result);
+        });
     } else if (req.method === 'POST' && path === '/activate') {
         readBody(req, function (body) {
             var data = {};
             try { data = JSON.parse(body); } catch (e) {}
             var session = data.session || '';
             if (!session) return json(res, { error: 'session required' }, 400);
+
+            // If create flag is set and worktree doesn't exist, create it first
+            if (data.create) {
+                var sdir = SESSIONS_DIR + '/' + session;
+                var exists = false;
+                try { fs.accessSync(sdir, fs.constants.F_OK); exists = true; } catch (e) {}
+                if (!exists) {
+                    var createResult = runCreate(session);
+                    if (!createResult.ok) {
+                        return json(res, { ok: false, error: 'create failed: ' + (createResult.error || ''), output: createResult.output }, 500);
+                    }
+                }
+            }
+
             var result = spawnSync('bash', ['/app/scripts/git-worktree.sh', 'activate', session], {
                 cwd: '/app', encoding: 'utf8', timeout: 5000
             });

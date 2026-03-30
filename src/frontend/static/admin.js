@@ -120,10 +120,11 @@ document.addEventListener('DOMContentLoaded', function () {
         apiCall('POST', '/sessions', {}).then(function (r) { return r.json(); })
         .then(function (data) {
             currentSessionId = data.id;
+            // Create worktree eagerly and activate it
             fetch('/diff-api/activate', {
                 method: 'POST', credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session: data.id })
+                body: JSON.stringify({ session: data.id, create: true })
             }).catch(function () {});
             loadSessions();
             loadSessionChat(data.id);
@@ -330,13 +331,17 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!currentSessionId) return;
         if (!confirm('Delete this session?')) return;
 
-        // Discard worktree if active for this session
-        var cleanup = hasWorkdir
-            ? fetch('/diff-api/discard', { method: 'POST', credentials: 'same-origin' }).catch(function () {})
-            : Promise.resolve();
+        var sessionToDelete = currentSessionId;
+
+        // Delete worktree and branch for this session
+        var cleanup = fetch('/diff-api/delete', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session: sessionToDelete })
+        }).catch(function () {});
 
         cleanup.then(function () {
-            return apiCall('DELETE', '/sessions/' + currentSessionId);
+            return apiCall('DELETE', '/sessions/' + sessionToDelete);
         }).then(function () {
             currentSessionId = null;
             chatMessages.textContent = '';
@@ -662,9 +667,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function discardChanges() {
-        if (!confirm('Discard all changes?')) return;
+        if (!confirm('Reset all changes? The session folder will be kept.')) return;
         discardBtn.disabled = true;
-        discardBtn.textContent = 'Discarding...';
+        discardBtn.textContent = 'Resetting...';
 
         fetch('/diff-api/discard', {
             method: 'POST',
@@ -672,19 +677,20 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .then(function (r) { return r.json(); })
         .then(function () {
-            hasWorkdir = false;
+            // Worktree is kept (only changes are reset)
             isCommitted = false;
+            trackedFiles = new Set();
+            diffData = [];
             deployBtn.style.display = 'none';
-            discardBtn.style.display = 'none';
-            reviewBtn.style.display = 'none';
             commitBtn.style.display = 'none';
-            appendSystemMessage('Changes discarded.');
-            completePlan();
+            // Keep discard and review visible since worktree still exists
+            appendSystemMessage('Changes reset. You can continue working.');
+            updateFilesPanel();
             discardBtn.disabled = false;
             discardBtn.textContent = 'Discard';
         })
         .catch(function () {
-            appendSystemMessage('Discard failed: could not reach diff API');
+            appendSystemMessage('Reset failed: could not reach diff API');
             discardBtn.disabled = false;
             discardBtn.textContent = 'Discard';
         });

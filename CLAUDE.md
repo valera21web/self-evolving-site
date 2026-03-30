@@ -8,7 +8,7 @@ Two AI agents run inside the container alongside a static site served by nginx:
 
 1. **News Agent** (`agents/news-agent.yaml`) — multi-agent pipeline running every N minutes via cron. An orchestrator (root) coordinates 4 sub-agents: **fetcher** (RSS via MCP), **selector** (picks best article by persona interests), **writer** (creates descriptions from author persona), **reviewer** (quality/style check with up to 3 revision iterations). Writes results to `src/data/news.json` and rebuilds the static site. Persona configuration via `NEWS_AUTHOR_PERSONA` and `NEWS_SELECTOR_PERSONA` env vars.
 
-2. **Dev Agent** (`agents/dev-agent.yaml`) — exposed via `cagent serve api` on internal port 8080, accessible through the admin chat UI at `/admin.html` (Basic Auth protected). Accepts instructions to modify the website source code, rebuilds and deploys changes live without Docker restart. Uses **git worktrees** for isolation: each task creates a feature branch, works in a worktree at `/app/workdir`, and merges back to main on deploy.
+2. **Dev Agent** (`agents/dev-agent.yaml`) — exposed via `cagent serve api` on internal port 8080, accessible through the admin chat UI at `/admin.html` (Basic Auth protected). Accepts instructions to modify the website source code, rebuilds and deploys changes live without Docker restart. Uses **git worktrees** for isolation: each session creates a feature branch + worktree at `/app/sessions/{session-id}/`, and merges back to main on deploy. Includes a **git_agent** sub-agent for git operations and error recovery (merge conflicts, broken worktrees).
 
 ## Processes (supervisord)
 
@@ -65,7 +65,7 @@ Config files: `observability/tempo.yaml`, `observability/grafana/provisioning/`
 - `src/config/feeds.json` — RSS feed URLs
 - `src/build/build.sh` — static site generator (bash + jq)
 - `scripts/git-init.sh` — git repo initialization (clone or local init)
-- `scripts/git-worktree.sh` — worktree lifecycle (create/deploy/discard/status)
+- `scripts/git-worktree.sh` — worktree lifecycle (create/deploy/discard/delete/activate/status)
 - `dist/` — generated static site (nginx serves this, gitignored)
 - `observability/` — Tempo + Grafana config for OpenTelemetry tracing
 
@@ -79,13 +79,15 @@ On startup, `scripts/git-init.sh` initializes a git repo in `/app/src`:
 - **Without `GIT_REPO_URL`**: `git init` + initial commit of existing files
 - **With `GIT_REPO_URL`**: clones the remote repo (supports SSH key, HTTPS token, or mounted key file for private repos)
 
-The dev agent uses **git worktrees** for each task:
-1. Creates feature branch `feature/{session-id}` + worktree at `/app/workdir`
-2. Makes changes in the worktree (isolated from main)
-3. On deploy: merges feature branch → main, removes worktree, rebuilds site
-4. On discard: removes worktree, deletes feature branch
+The dev agent uses **git worktrees** for each session:
+1. On session creation: creates feature branch `feature/{session-id}` + worktree at `/app/sessions/{session-id}/`
+2. `/app/workdir` symlink points to the active session's worktree
+3. Makes changes in the worktree (isolated from main)
+4. On deploy: merges feature branch → main, keeps worktree, rebuilds site
+5. On discard: resets worktree to base commit (keeps folder and branch)
+6. On session delete: removes worktree directory and deletes feature branch
 
-Only one active worktree at a time. The deploy script auto-commits any pending `news.json` changes on main before merging (safety net for news agent writes).
+Multiple sessions can have worktrees simultaneously; only one is active at a time. The deploy script auto-commits any pending `news.json` changes on main before merging (safety net for news agent writes). The `git_agent` sub-agent handles all git operations and can resolve merge conflicts or fix broken worktrees.
 
 ## Adding RSS Feeds
 

@@ -45,6 +45,9 @@ echo "[entrypoint] News agent cron set to every ${RSS_INTERVAL} minutes"
 echo "[entrypoint] Initializing git repository..."
 bash /app/scripts/git-init.sh
 
+# Clean up stale worktree references (e.g. after container restart)
+cd /app/src && git worktree prune 2>/dev/null || true
+
 # Run initial build
 echo "[entrypoint] Running initial build..."
 bash /app/src/build/build.sh

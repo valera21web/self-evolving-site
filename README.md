@@ -3,7 +3,7 @@
 A self-modifying news website in Docker containers. AI agents (powered by [Docker Agent](https://docs.docker.com/ai/docker-agent/) + Azure OpenAI) run inside the app container with full OpenTelemetry tracing to Grafana.
 
 - **News Agent** — multi-agent pipeline: fetches 31+ RSS feeds, selects the best story, writes expert analysis, reviews quality, publishes
-- **Dev Agent** — multi-agent pipeline: analyzes admin instructions, implements frontend changes on a **git feature branch** (via worktree), verifies results, merges on deploy
+- **Dev Agent** — multi-agent pipeline: analyzes admin instructions, implements frontend changes on a **git feature branch** (via worktree), verifies results, merges on deploy. Includes a **git agent** for git operations and error recovery
 
 No restart needed — agents edit source, rebuild, and changes appear instantly. Optionally connects to a remote git repo (supports private repos via SSH key or HTTPS token).
 
@@ -128,7 +128,7 @@ graph LR
 
 ## Dev Agent — Multi-Agent Pipeline
 
-The dev agent (`agents/dev-agent.yaml`) is a 4-agent pipeline:
+The dev agent (`agents/dev-agent.yaml`) is a 5-agent pipeline:
 
 ```mermaid
 graph LR
@@ -136,22 +136,28 @@ graph LR
     A["Analyzer<br/>reads files, plans"]
     I["Implementer<br/>writes to workdir"]
     V["Verifier<br/>diff validation"]
+    G["Git Agent<br/>git ops & recovery"]
 
     O -->|"1"| A
     O -->|"2"| I
     O -->|"3"| V
+    O -.->|"git ops"| G
 ```
 
 Accessible through the admin chat UI at `/admin.html` (Basic Auth protected).
 
+The **git agent** handles all git operations (commit, deploy, discard) and can resolve issues like merge conflicts or broken worktrees using direct git commands.
+
 ### Git Workflow
 
-The dev agent uses **git worktrees** for safe, isolated changes:
+Each session gets its own **git worktree** at `/app/sessions/{session-id}/`, created immediately when the session is created:
 
-1. Each task creates a **feature branch** (`feature/{session-id}`) and a worktree at `/app/workdir`
-2. Changes are made in the worktree, isolated from the main branch
-3. On **deploy**: feature branch is merged to main, worktree cleaned up, site rebuilt
-4. On **discard**: worktree removed, feature branch deleted — no traces left
+1. On **session create**: creates feature branch `feature/{session-id}` + worktree at `/app/sessions/{session-id}/`
+2. `/app/workdir` symlink points to the active session's worktree
+3. Changes are made in the worktree, isolated from the main branch
+4. On **deploy**: feature branch is merged to main, site rebuilt, worktree kept for continued work
+5. On **discard**: worktree reset to base commit (folder and branch preserved — you can continue working)
+6. On **session delete**: worktree directory removed, feature branch deleted — full cleanup
 
 **Remote repo support** (optional): set `GIT_REPO_URL` to clone a remote repo on startup. For private repos, use one of:
 - `GIT_TOKEN` — HTTPS personal access token (GitHub, GitLab, Azure DevOps)

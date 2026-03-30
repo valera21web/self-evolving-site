@@ -3,6 +3,7 @@ set -e
 
 SRC="/app/src"
 WORKDIR="/app/workdir"
+SESSIONS_DIR="/app/sessions"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 
 usage() {
@@ -11,7 +12,8 @@ usage() {
     echo "Commands:"
     echo "  create <session-id>   Create or reuse session worktree"
     echo "  deploy                Merge to main, rebuild, keep worktree"
-    echo "  discard               Remove active session worktree"
+    echo "  discard               Reset active session worktree to base (keep folder)"
+    echo "  delete <session-id>   Remove session worktree and branch completely"
     echo "  activate <session-id> Switch symlink to session worktree"
     echo "  status                Show current worktree state"
     exit 1
@@ -19,7 +21,7 @@ usage() {
 
 # Get the actual worktree path for a session
 session_dir() {
-    echo "/app/workdir-${1}"
+    echo "${SESSIONS_DIR}/${1}"
 }
 
 # Get active session ID from marker file
@@ -27,7 +29,7 @@ active_session() {
     cat /app/.active-session 2>/dev/null || echo ""
 }
 
-# Update symlink /app/workdir → /app/workdir-<session>
+# Update symlink /app/workdir → /app/sessions/<session>
 update_symlink() {
     SDIR="$1"
     rm -f "$WORKDIR"
@@ -37,7 +39,6 @@ update_symlink() {
 cmd_create() {
     SESSION_ID="$1"
     if [ -z "$SESSION_ID" ]; then
-        # Fall back to active session or generate new ID
         SESSION_ID=$(active_session)
         if [ -z "$SESSION_ID" ]; then
             SESSION_ID="$(date +%s)"
@@ -46,6 +47,21 @@ cmd_create() {
 
     SDIR=$(session_dir "$SESSION_ID")
     cd "$SRC"
+
+    # Migration: move old-style worktree to new path
+    OLD_DIR="/app/workdir-${SESSION_ID}"
+    if [ -d "$OLD_DIR" ] && [ ! -d "$SDIR" ]; then
+        echo "[worktree] Migrating from $OLD_DIR to $SDIR..."
+        git worktree move "$OLD_DIR" "$SDIR" 2>/dev/null || {
+            # If move fails, remove old and recreate
+            echo "[worktree] Move failed, recreating..."
+            git worktree remove "$OLD_DIR" --force 2>/dev/null || true
+        }
+        # Move base marker
+        if [ -f "/app/.branch-base-${SESSION_ID}" ]; then
+            mv "/app/.branch-base-${SESSION_ID}" "$SDIR/.branch-base" 2>/dev/null || true
+        fi
+    fi
 
     if [ -d "$SDIR" ]; then
         # Worktree already exists for this session — sync with main
@@ -71,8 +87,8 @@ cmd_create() {
         echo "[worktree] Created new branch '$BRANCH'."
     fi
 
-    # Save base commit for cumulative diffs
-    git rev-parse HEAD > "/app/.branch-base-${SESSION_ID}"
+    # Save base commit inside session folder
+    git rev-parse HEAD > "$SDIR/.branch-base"
 
     update_symlink "$SDIR"
     echo "$SESSION_ID" > /app/.active-session
@@ -125,6 +141,9 @@ cmd_deploy() {
     cd "$SDIR"
     git merge "$GIT_BRANCH" --no-edit 2>/dev/null || true
 
+    # Update base commit to current HEAD (post-merge)
+    git rev-parse HEAD > "$SDIR/.branch-base"
+
     # Rebuild the site
     echo "[worktree] Rebuilding site..."
     bash /app/src/build/build.sh
@@ -141,22 +160,73 @@ cmd_discard() {
 
     SDIR=$(session_dir "$ACTIVE")
     if [ ! -d "$SDIR" ]; then
-        echo "[worktree] No worktree to discard."
-        rm -f /app/.active-session "/app/.branch-base-${ACTIVE}"
-        rm -f "$WORKDIR"
+        echo "[worktree] No worktree at $SDIR, nothing to reset."
         exit 0
     fi
 
-    BRANCH=$(git -C "$SDIR" branch --show-current)
-    echo "[worktree] Discarding session '$ACTIVE' (branch: $BRANCH)..."
+    # Read base commit
+    BASE_COMMIT=""
+    if [ -f "$SDIR/.branch-base" ]; then
+        BASE_COMMIT=$(cat "$SDIR/.branch-base")
+    fi
+
+    echo "[worktree] Resetting session '$ACTIVE' to base state..."
+
+    cd "$SDIR"
+    if [ -n "$BASE_COMMIT" ]; then
+        git reset --hard "$BASE_COMMIT"
+    else
+        # Fallback: reset to main
+        git reset --hard "$GIT_BRANCH"
+    fi
+    git clean -fd
+
+    echo "[worktree] Session '$ACTIVE' reset. Worktree kept at $SDIR."
+}
+
+cmd_delete() {
+    SESSION_ID="$1"
+    if [ -z "$SESSION_ID" ]; then
+        # Fall back to active session
+        SESSION_ID=$(active_session)
+    fi
+    if [ -z "$SESSION_ID" ]; then
+        echo "[worktree] No session to delete."
+        exit 0
+    fi
+
+    SDIR=$(session_dir "$SESSION_ID")
+    ACTIVE=$(active_session)
+
+    if [ ! -d "$SDIR" ]; then
+        echo "[worktree] No worktree at $SDIR."
+        # Clean up markers if this was the active session
+        if [ "$SESSION_ID" = "$ACTIVE" ]; then
+            rm -f /app/.active-session
+            rm -f "$WORKDIR"
+        fi
+        exit 0
+    fi
+
+    BRANCH=$(git -C "$SDIR" branch --show-current 2>/dev/null || echo "feature/${SESSION_ID}")
+    echo "[worktree] Deleting session '$SESSION_ID' (branch: $BRANCH)..."
 
     cd "$SRC"
-    git worktree remove "$SDIR" --force
+    # Try proper git worktree removal first
+    git worktree remove "$SDIR" --force 2>/dev/null || true
+    # Safety net: ensure directory is gone regardless
+    rm -rf "$SDIR"
+    # Clean up git's internal worktree tracking
+    git worktree prune 2>/dev/null || true
     git branch -D "$BRANCH" 2>/dev/null || true
-    rm -f /app/.active-session "/app/.branch-base-${ACTIVE}"
-    rm -f "$WORKDIR"
 
-    echo "[worktree] Discarded session '$ACTIVE'."
+    # Clean up markers if this was the active session
+    if [ "$SESSION_ID" = "$ACTIVE" ]; then
+        rm -f /app/.active-session
+        rm -f "$WORKDIR"
+    fi
+
+    echo "[worktree] Deleted session '$SESSION_ID'."
 }
 
 cmd_activate() {
@@ -205,6 +275,7 @@ case "$COMMAND" in
     create)   cmd_create "$@" ;;
     deploy)   cmd_deploy ;;
     discard)  cmd_discard ;;
+    delete)   cmd_delete "$@" ;;
     activate) cmd_activate "$@" ;;
     status)   cmd_status ;;
     *)        usage ;;
